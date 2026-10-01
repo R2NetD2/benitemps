@@ -1,17 +1,25 @@
 [
  {
-  "run_id": "2024-10-29_00Z_smoke-test",
-  "name": "smoke-test",
-  "title": "3 h, single 12 km domain around Valencia; validates fetch/WPS/real/wrf/restart.",
-  "event": false,
+  "run_id": "2024-10-28_12Z_dana-2024-10",
+  "name": "dana-2024-10",
+  "title": "DANA Valencia, 29 oct 2024",
+  "event": true,
   "complete": true,
-  "init": "2024-10-29T00:00:00Z",
-  "end": "2024-10-29T03:00:00Z",
-  "created_at": "2026-10-01T01:28:00Z",
+  "init": "2024-10-28T12:00:00Z",
+  "end": "2024-10-30T06:00:00Z",
+  "created_at": "2026-10-01T16:05:37Z",
   "domains": [
    {
     "id": 1,
-    "dx_km": 12.0
+    "dx_km": 9.0
+   },
+   {
+    "id": 2,
+    "dx_km": 3.0
+   },
+   {
+    "id": 3,
+    "dx_km": 1.0
    }
   ],
   "variables": [
@@ -19,7 +27,8 @@
    "rain_step",
    "wind10",
    "t2",
-   "mslp"
+   "mslp",
+   "refl"
   ]
  }
 ]

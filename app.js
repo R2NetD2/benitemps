@@ -1,4 +1,4 @@
-// WRF Valencia static site. Plain JS, no build step, no external resources.
+// BeniTemps (WRF Valencia) static site. Plain JS, no build step, no external resources.
 // Data (all paths relative to this page):
 //   runs.json                  [{run_id, name, title, event, init, end, created_at, domains, variables}]
 //                              (a missing "event" means a forecast: listed under "Predicciones")
@@ -259,7 +259,7 @@
       (mod.ic_bc || "?") + (mod.boundary_interval_hours ? " cada " + mod.boundary_interval_hours + " h" : "") +
       (mod.e_vert ? " · " + mod.e_vert + " niveles verticales" : "") + ". " + (m.physics_summary || "") +
       ". Mapas generados el " + (m.created_at ? local(m.created_at) : "?") + " hora local.";
-    document.title = (m.title || m.name) + " · WRF Valencia";
+    document.title = (m.title || m.name) + " · BeniTemps";
   }
 
   // ------------------------------------------------------------------ actions
