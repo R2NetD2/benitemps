@@ -1,0 +1,196 @@
+/* WRF Valencia static site. No external fonts or resources. */
+:root {
+  --bg: #f7f7f4;
+  --fg: #1d1f21;
+  --muted: #5b6166;
+  --card: #ffffff;
+  --line: #d6d8d2;
+  --accent: #1f5fa8;
+  --accent-fg: #ffffff;
+  --focus: #e07a00;
+  --error-bg: #fde8e6;
+  --error-fg: #8a1c12;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181b;
+    --fg: #e7e9ea;
+    --muted: #a3abb2;
+    --card: #1f2327;
+    --line: #353b41;
+    --accent: #6aa8ec;
+    --accent-fg: #0d1114;
+    --focus: #ffb347;
+    --error-bg: #3d1915;
+    --error-fg: #ffb4a8;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+a { color: var(--accent); }
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+.skip:focus { left: 1rem; top: 1rem; background: var(--card); padding: .5rem 1rem; z-index: 10; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+header.top, main, footer {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header.top { padding-top: 1.25rem; }
+header.top h1 { margin: 0; font-size: 1.6rem; }
+.sub { margin: .25rem 0 1rem; color: var(--muted); }
+
+h2 { font-size: 1.25rem; margin: 1rem 0 .25rem; }
+
+.muted { color: var(--muted); font-size: .9rem; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.25rem;
+}
+
+.field { display: flex; flex-direction: column; min-width: 0; flex: 1 1 260px; }
+.field label { font-size: .85rem; color: var(--muted); margin-bottom: .2rem; }
+
+select, button, input[type="range"] { font: inherit; color: inherit; }
+
+select {
+  width: 100%;
+  padding: .45rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: .75rem 0;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  padding: .4rem .8rem;
+  min-height: 2.5rem;
+}
+button:disabled { cursor: default; opacity: .5; }
+
+.tab[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.viewer figure { margin: 0; }
+
+.viewer img, .charts img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+figcaption { margin-top: .3rem; }
+
+.timebar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .75rem;
+}
+.timebar input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); min-height: 2.5rem; }
+#play { min-width: 7.5rem; }
+#play[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+.time-label { font-weight: 600; margin: .4rem 0 0; }
+.hint { margin-top: .2rem; }
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background: var(--card);
+  font-size: .95rem;
+}
+th, td {
+  text-align: left;
+  padding: .45rem .6rem;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+thead th { font-size: .85rem; color: var(--muted); font-weight: 600; }
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.charts figure { margin: 0; }
+
+.error {
+  background: var(--error-bg);
+  color: var(--error-fg);
+  padding: .75rem 1rem;
+  border-radius: 6px;
+}
+
+footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid var(--line);
+}
+.disclaimer { font-size: 1rem; }
+
+@media (max-width: 520px) {
+  header.top h1 { font-size: 1.35rem; }
+  #play { min-width: 0; }
+  th, td { padding: .4rem .45rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Simulaciones experimentales del modelo WRF sobre Valencia: lluvia, viento, temperatura y presión.">
+  <title>WRF Valencia · mapas</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#viewer">Saltar al mapa</a>
+  <header class="top">
+    <h1>WRF Valencia</h1>
+    <p class="sub">Simulaciones de alta resolución de lluvia, viento y temperatura con el modelo WRF</p>
+  </header>
+
+  <main>
+    <section class="controls" aria-label="Selección de simulación">
+      <div class="field">
+        <label for="run">Simulación</label>
+        <select id="run"></select>
+      </div>
+      <div class="field">
+        <label for="domain">Dominio (resolución)</label>
+        <select id="domain"></select>
+      </div>
+    </section>
+
+    <h2 id="run-title"></h2>
+    <p id="run-info" class="muted"></p>
+
+    <div class="tabs" id="vars" role="group" aria-label="Variable"></div>
+
+    <section class="viewer" id="viewer" aria-label="Mapa">
+      <figure>
+        <img id="map" alt="" width="800" height="860" decoding="async">
+        <figcaption id="caption" class="muted"></figcaption>
+      </figure>
+      <div class="timebar">
+        <button id="prev" type="button" aria-label="Hora anterior">&#9664;</button>
+        <button id="play" type="button" aria-pressed="false">Reproducir</button>
+        <button id="next" type="button" aria-label="Hora siguiente">&#9654;</button>
+        <label for="time" class="sr-only">Hora válida</label>
+        <input id="time" type="range" min="0" max="0" step="1" value="0">
+      </div>
+      <p id="time-label" class="time-label" aria-live="polite"></p>
+      <p class="muted hint">Teclado: flechas izquierda/derecha para cambiar de hora.</p>
+    </section>
+
+    <section id="points-section" aria-labelledby="points-h" hidden>
+      <h2 id="points-h">Puntos</h2>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Resumen de lluvia por punto</caption>
+          <thead>
+            <tr>
+              <th scope="col">Punto</th>
+              <th scope="col">Dominio</th>
+              <th scope="col">Lluvia total (mm)</th>
+              <th scope="col">Máxima en un intervalo (mm)</th>
+              <th scope="col">Fin del intervalo (hora local)</th>
+            </tr>
+          </thead>
+          <tbody id="points-body"></tbody>
+        </table>
+      </div>
+      <div id="point-charts" class="charts"></div>
+    </section>
+
+    <p id="error" class="error" role="alert" hidden></p>
+  </main>
+
+  <footer>
+    <p class="disclaimer"><strong>Predicción experimental, no oficial.</strong>
+      Avisos oficiales: <a href="https://www.aemet.es/">AEMET (aemet.es)</a>.</p>
+    <p id="model-info" class="muted"></p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,210 @@
+{
+ "schema": 1,
+ "run_id": "2024-10-29_00Z_smoke-test",
+ "name": "smoke-test",
+ "title": "3 h, single 12 km domain around Valencia; validates fetch/WPS/real/wrf/restart.",
+ "description": "3 h, single 12 km domain around Valencia; validates fetch/WPS/real/wrf/restart.",
+ "event": false,
+ "complete": true,
+ "init": "2024-10-29T00:00:00Z",
+ "end": "2024-10-29T03:00:00Z",
+ "times": [
+  "2024-10-29T00:00:00Z",
+  "2024-10-29T01:00:00Z",
+  "2024-10-29T02:00:00Z",
+  "2024-10-29T03:00:00Z"
+ ],
+ "domains": [
+  {
+   "id": 1,
+   "name": "d01",
+   "dx_km": 12.0,
+   "shape": [
+    80,
+    90
+   ],
+   "bounds": {
+    "south": 34.9852,
+    "west": -7.0086,
+    "north": 43.6594,
+    "east": 6.2086
+   },
+   "times": [
+    "2024-10-29T00:00:00Z",
+    "2024-10-29T01:00:00Z",
+    "2024-10-29T02:00:00Z",
+    "2024-10-29T03:00:00Z"
+   ],
+   "variables": {
+    "rain_total": {
+     "kind": "rain_total",
+     "label": "Lluvia total",
+     "units": "mm",
+     "frames": [
+      {
+       "time": "2024-10-29T03:00:00Z",
+       "file": "d01/rain_total.png"
+      }
+     ],
+     "max_mm": 34.7
+    },
+    "rain_1h": {
+     "kind": "rain_step",
+     "label": "Lluvia en 1h",
+     "units": "mm",
+     "frames": [
+      {
+       "time": "2024-10-29T01:00:00Z",
+       "file": "d01/rain_1h_2024-10-29T01.png",
+       "interval_min": 60
+      },
+      {
+       "time": "2024-10-29T02:00:00Z",
+       "file": "d01/rain_1h_2024-10-29T02.png",
+       "interval_min": 60
+      },
+      {
+       "time": "2024-10-29T03:00:00Z",
+       "file": "d01/rain_1h_2024-10-29T03.png",
+       "interval_min": 60
+      }
+     ],
+     "interval_min": 60
+    },
+    "wind10": {
+     "kind": "wind10",
+     "label": "Viento",
+     "units": "km/h",
+     "frames": [
+      {
+       "time": "2024-10-29T00:00:00Z",
+       "file": "d01/wind10_2024-10-29T00.png"
+      },
+      {
+       "time": "2024-10-29T01:00:00Z",
+       "file": "d01/wind10_2024-10-29T01.png"
+      },
+      {
+       "time": "2024-10-29T02:00:00Z",
+       "file": "d01/wind10_2024-10-29T02.png"
+      },
+      {
+       "time": "2024-10-29T03:00:00Z",
+       "file": "d01/wind10_2024-10-29T03.png"
+      }
+     ]
+    },
+    "t2": {
+     "kind": "t2",
+     "label": "Temperatura",
+     "units": "°C",
+     "frames": [
+      {
+       "time": "2024-10-29T00:00:00Z",
+       "file": "d01/t2_2024-10-29T00.png"
+      },
+      {
+       "time": "2024-10-29T01:00:00Z",
+       "file": "d01/t2_2024-10-29T01.png"
+      },
+      {
+       "time": "2024-10-29T02:00:00Z",
+       "file": "d01/t2_2024-10-29T02.png"
+      },
+      {
+       "time": "2024-10-29T03:00:00Z",
+       "file": "d01/t2_2024-10-29T03.png"
+      }
+     ]
+    },
+    "mslp": {
+     "kind": "mslp",
+     "label": "Presión",
+     "units": "hPa",
+     "frames": [
+      {
+       "time": "2024-10-29T00:00:00Z",
+       "file": "d01/mslp_2024-10-29T00.png"
+      },
+      {
+       "time": "2024-10-29T01:00:00Z",
+       "file": "d01/mslp_2024-10-29T01.png"
+      },
+      {
+       "time": "2024-10-29T02:00:00Z",
+       "file": "d01/mslp_2024-10-29T02.png"
+      },
+      {
+       "time": "2024-10-29T03:00:00Z",
+       "file": "d01/mslp_2024-10-29T03.png"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "variables": [
+  "rain_total",
+  "rain_step",
+  "wind10",
+  "t2",
+  "mslp"
+ ],
+ "points": [
+  {
+   "name": "Valencia",
+   "slug": "valencia",
+   "lat": 39.47,
+   "lon": -0.376,
+   "domain": 1,
+   "dx_km": 12.0,
+   "i": 46,
+   "j": 41,
+   "grid_lat": 39.4539,
+   "grid_lon": -0.3301,
+   "hgt_m": 1.2,
+   "land": true,
+   "step_min": 60,
+   "step_label": "1h",
+   "total_mm": 0.02,
+   "max_step_mm": 0.02,
+   "max_step_time": "2024-10-29T01:00:00Z",
+   "chart": "points/valencia.png"
+  }
+ ],
+ "model": {
+  "wrf": "4.7.1",
+  "wrfrun": "0.1.0",
+  "ic_bc": "ERA5",
+  "boundary_interval_hours": 3,
+  "e_vert": 35
+ },
+ "physics": {
+  "mp_physics": [
+   8
+  ],
+  "cu_physics": [
+   1
+  ],
+  "bl_pbl_physics": [
+   1
+  ],
+  "sf_sfclay_physics": [
+   1
+  ],
+  "sf_surface_physics": [
+   2
+  ],
+  "ra_lw_physics": [
+   4
+  ],
+  "ra_sw_physics": [
+   4
+  ],
+  "sf_urban_physics": [
+   0
+  ]
+ },
+ "physics_summary": "Microfísica Thompson (8); cúmulos Kain-Fritsch (1); capa límite YSU (1); suelo Noah (2); radiación RRTMG (4)",
+ "created_at": "2026-10-01T01:28:00Z"
+}

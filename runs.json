@@ -1,0 +1,25 @@
+[
+ {
+  "run_id": "2024-10-29_00Z_smoke-test",
+  "name": "smoke-test",
+  "title": "3 h, single 12 km domain around Valencia; validates fetch/WPS/real/wrf/restart.",
+  "event": false,
+  "complete": true,
+  "init": "2024-10-29T00:00:00Z",
+  "end": "2024-10-29T03:00:00Z",
+  "created_at": "2026-10-01T01:28:00Z",
+  "domains": [
+   {
+    "id": 1,
+    "dx_km": 12.0
+   }
+  ],
+  "variables": [
+   "rain_total",
+   "rain_step",
+   "wind10",
+   "t2",
+   "mslp"
+  ]
+ }
+]
