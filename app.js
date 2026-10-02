@@ -5,8 +5,14 @@
 //   runs/<id>/meta.json        {run_id, title, event, init, end, domains: [{id, name, dx_km, times,
 //                               variables: {<key>: {kind, label, units, frames: [{time, file}]}}}],
 //                               points, model, physics_summary, created_at}
-//   runs/<id>/points.json      {points: [{name, slug, chart, total_mm, max_step_mm, max_step_time, ...}]}
+//   runs/<id>/points.json      {points: [{name, slug, chart, total_mm, max_step_mm, max_step_time, series, ...}]}
+//   runs/<id>/web/dNN/...png    value grids for the interactive map (map.js); meta.json domains carry
+//                              grid + outline, variables carry legend + encoding, frames carry "values"
 // Deep link: #run=<id>&var=<kind>&d=<n>&t=<ISO UTC>
+// The interactive map (map.js, MapLibre + OSM basemap) is used when the browser supports it and the
+// domain has value grids; otherwise the static PNG maps are shown, as before.
+// The side cards ("En tus puntos", "Máximo en el dominio") read the same value grids as the map; without
+// them the point values fall back to points.json and the maximum card is hidden. Nothing is estimated.
 "use strict";
 
 (function () {
@@ -18,10 +24,28 @@
     ["mslp", "Presión"],
     ["refl", "Radar"]
   ];
+  // what the map shows, for the caption under it
+  var CAPTIONS = {
+    rain_total: "Precipitación acumulada en toda la simulación",
+    wind10: "Viento a 10 m en el instante elegido",
+    t2: "Temperatura a 2 m en el instante elegido",
+    mslp: "Presión a nivel del mar en el instante elegido",
+    refl: "Reflectividad simulada (radar) en el instante elegido"
+  };
+  // tab icons (24 x 24 stroke paths)
+  var ICONS = {
+    rain_total: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+    rain_step: '<path d="M7 15a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 6a4.5 4.5 0 0 1 .5 8.97"/><path d="M9 18l-1 3"/>' +
+               '<path d="M13 18l-1 3"/><path d="M17 17l-1 3"/>',
+    wind10: '<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path d="M3 16h7"/>',
+    t2: '<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/>',
+    mslp: '<circle cx="12" cy="13" r="8"/><path d="M12 13l3-4"/><path d="M12 3v2"/>',
+    refl: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/>'
+  };
   var PLAY_MS = 900;
 
   var state = { runs: [], meta: null, points: [], runId: null, kind: "rain_total", dom: null, idx: 0,
-                timer: null, wantTime: null };
+                timer: null, wantTime: null, interactive: false, mapReady: null, fitPending: true, maxAt: null };
 
   function $(id) { return document.getElementById(id); }
 
@@ -32,14 +56,24 @@
   var fmtLocalShort = new Intl.DateTimeFormat("es-ES", {
     timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
   });
+  var fmtLocalDay = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid", weekday: "short", day: "numeric", month: "short"
+  });
+  var fmtLocalHm = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit" });
+  var fmtLocalH = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", hour: "2-digit", hourCycle: "h23" });
   var fmtUtc = new Intl.DateTimeFormat("es-ES", {
     timeZone: "UTC", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
   });
+  var fmtUtcHm = new Intl.DateTimeFormat("es-ES", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" });
 
   function parseIso(s) { return new Date(s); }
   function local(s) { return fmtLocal.format(parseIso(s)); }
   function localShort(s) { return fmtLocalShort.format(parseIso(s)); }
+  // "mié, 16 sept · 08:00"
+  function localDayTime(s) { return fmtLocalDay.format(parseIso(s)) + " · " + fmtLocalHm.format(parseIso(s)); }
   function utc(s) { return fmtUtc.format(parseIso(s)) + " UTC"; }
+  function utcHm(s) { return fmtUtcHm.format(parseIso(s)); }
+  function hoursBetween(a, b) { return Math.round((parseIso(b) - parseIso(a)) / 36e5); }
 
   function showError(msg) {
     var e = $("error");
@@ -52,6 +86,13 @@
       if (!r.ok) { throw new Error(url + ": HTTP " + r.status); }
       return r.json();
     });
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
   }
 
   // ------------------------------------------------------------------ deep links
@@ -70,11 +111,12 @@
     return out;
   }
 
+  // t= is the instant the visitor chose; on "Lluvia total" (one frame) it keeps the last instant seen
+  // elsewhere, so a shared link and a switch back to a timed variable both land on the same time
   function writeHash() {
-    var f = currentFrames()[state.idx];
     var parts = ["run=" + encodeURIComponent(state.runId), "var=" + encodeURIComponent(state.kind),
                  "d=" + encodeURIComponent(state.dom)];
-    if (f) { parts.push("t=" + encodeURIComponent(f.time)); }
+    if (state.wantTime) { parts.push("t=" + encodeURIComponent(state.wantTime)); }
     history.replaceState(null, "", "#" + parts.join("&"));
   }
 
@@ -106,6 +148,8 @@
   function currentVar() { return variableOf(domain(), state.kind); }
   function currentFrames() { var v = currentVar(); return v ? v.frames : []; }
 
+  function stepText(mins) { return mins % 60 === 0 ? (mins / 60) + " h" : mins + " min"; }
+
   function tabLabel(kind, v) {
     if (kind === "rain_step" && v && v.interval_min && v.interval_min !== 60) {
       return v.interval_min % 60 === 0 ? "Lluvia cada " + (v.interval_min / 60) + " h"
@@ -115,6 +159,20 @@
     return kind;
   }
 
+  function captionOf(v) {
+    if (v.kind === "rain_step") {
+      return "Precipitación en " + (v.interval_min && v.interval_min !== 60 ? "los " + stepText(v.interval_min)
+        : "la hora") + " anterior" + (v.interval_min && v.interval_min !== 60 ? "es" : "") + " al instante elegido";
+    }
+    return CAPTIONS[v.kind] || tabLabel(v.kind, v);
+  }
+
+  function unitsOf(v) {
+    return v.kind === "rain_step" ? v.units + " / " + stepText(v.interval_min || 60) : v.units;
+  }
+
+  function domText(dom) { return dom.name + " · " + dom.dx_km + " km"; }
+
   function closestIndex(frames, iso) {
     if (!iso || !frames.length) { return 0; }
     var t = parseIso(iso).getTime(), best = 0, bestD = Infinity;
@@ -123,6 +181,20 @@
       if (d < bestD) { bestD = d; best = i; }
     });
     return best;
+  }
+
+  function runBase() { return "runs/" + encodeURIComponent(state.runId) + "/"; }
+
+  function useInteractive() { return state.interactive && window.BeniMap.hasGrid(domain()); }
+
+  // popup text for the interactive map: what the value is and when it is valid
+  function describeValue(v, f) {
+    if (v.kind === "rain_total") { return "Lluvia acumulada en toda la simulación"; }
+    if (v.kind === "rain_step") {
+      var mins = f.interval_min || v.interval_min || 60;
+      return "Lluvia en " + stepText(mins) + ", hasta las " + localShort(f.time);
+    }
+    return tabLabel(v.kind, v) + " · " + localShort(f.time) + " hora local";
   }
 
   // ------------------------------------------------------------------ rendering
@@ -146,16 +218,24 @@
     sel.value = state.runId;
   }
 
+  // domain segmented control: one button per meta.domains entry
   function fillDomains() {
-    var sel = $("domain");
-    sel.textContent = "";
+    var box = $("domain");
+    box.textContent = "";
     state.meta.domains.forEach(function (d) {
-      var o = document.createElement("option");
-      o.value = String(d.id);
-      o.textContent = d.name + " · " + d.dx_km + " km";
-      sel.appendChild(o);
+      var b = el("button");
+      b.type = "button";
+      b.appendChild(document.createTextNode(d.name + " "));
+      b.appendChild(el("span", "mono", d.dx_km + " km"));
+      b.setAttribute("aria-pressed", String(d.id === state.dom));
+      b.addEventListener("click", function () { if (d.id !== state.dom) { selectDomain(d.id); } });
+      box.appendChild(b);
     });
-    sel.value = String(state.dom);
+  }
+
+  function markDomains() {
+    var btns = $("domain").children;
+    state.meta.domains.forEach(function (d, i) { if (btns[i]) { btns[i].setAttribute("aria-pressed", String(d.id === state.dom)); } });
   }
 
   function fillTabs() {
@@ -165,14 +245,32 @@
     KINDS.forEach(function (k) {
       var v = variableOf(dom, k[0]);
       if (!v) { return; }
-      var b = document.createElement("button");
+      var b = el("button", "tab");
       b.type = "button";
-      b.className = "tab";
-      b.textContent = tabLabel(k[0], v);
+      b.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[k[0]] + "</svg>";
+      b.appendChild(document.createTextNode(tabLabel(k[0], v)));
       b.setAttribute("aria-pressed", String(k[0] === state.kind));
       b.addEventListener("click", function () { selectKind(k[0]); });
       box.appendChild(b);
     });
+  }
+
+  // local-hour ticks under the slider, placed at their frame's position
+  function fillTicks(frames) {
+    var box = $("ticks");
+    box.textContent = "";
+    var n = frames.length;
+    if (n < 2) { return; }
+    var want = Math.min(7, n), last = -1;
+    for (var t = 0; t < want; t++) {
+      var i = Math.round(t * (n - 1) / (want - 1));
+      if (i === last) { continue; }
+      last = i;
+      var s = el("span", "", fmtLocalH.format(parseIso(frames[i].time)));
+      s.style.left = (100 * i / (n - 1)) + "%";
+      box.appendChild(s);
+    }
   }
 
   function showFrame() {
@@ -180,30 +278,122 @@
     var v = currentVar();
     var dom = domain();
     var slider = $("time");
+    var single = frames.length <= 1;
     slider.max = String(Math.max(0, frames.length - 1));
     slider.value = String(state.idx);
-    slider.disabled = frames.length <= 1;
-    $("prev").disabled = $("next").disabled = $("play").disabled = frames.length <= 1;
+    slider.disabled = single;
+    $("prev").disabled = $("next").disabled = $("play").disabled = single;
     var f = frames[state.idx];
     var img = $("map");
-    if (!f) {
+    var live = useInteractive();
+    $("mapgl").hidden = !live;
+    $("static-fig").hidden = live;
+    $("legend").hidden = !live;
+    // "Lluvia total" is one frame over the whole run: show its window instead of a player that does nothing
+    var accum = state.kind === "rain_total";
+    $("accum").hidden = !accum;
+    $("player").hidden = accum;
+    var dataP = Promise.resolve(false);
+    if (live) {
+      if (state.fitPending) { window.BeniMap.setDomain(dom, runBase(), true); state.fitPending = false; }
+      dataP = window.BeniMap.showFrame(v, f);
+      $("legend").innerHTML = window.BeniMap.legendHtml(v);
+      var after = frames[(state.idx + 1) % frames.length];
+      if (after && after !== f) { window.BeniMap.prefetch(v, after); }
+    }
+    var link = $("static-link");
+    link.hidden = !f;
+    if (f) { link.href = runBase() + f.file; }
+    if (!f || !v) {
       img.removeAttribute("src");
       img.alt = "Sin mapa para esta selección";
       $("time-label").textContent = "";
+      $("map-chip").textContent = "";
+      updateSide(false);
       return;
     }
-    img.src = "runs/" + encodeURIComponent(state.runId) + "/" + f.file;
+    if (!live) { img.src = runBase() + f.file; }
     var label = tabLabel(state.kind, v);
     img.alt = label + " (" + v.units + ") en " + dom.name + " (" + dom.dx_km + " km), válido el " +
       local(f.time) + " hora local (" + utc(f.time) + ")";
-    $("caption").textContent = label + " · " + dom.name + " (" + dom.dx_km + " km)" +
-      (state.kind === "rain_total" ? " · acumulada en toda la simulación" : "");
-    $("time-label").textContent = "Válido: " + local(f.time) + " hora local · " + utc(f.time) +
-      (frames.length > 1 ? " · " + (state.idx + 1) + "/" + frames.length : "");
+    var chip = $("map-chip");
+    chip.textContent = "";
+    chip.appendChild(el("b", "", label));
+    chip.appendChild(el("span", "sep", "·"));
+    chip.appendChild(el("span", "mono", domText(dom)));
+    $("caption").textContent = captionOf(v);
+    $("legend-units").textContent = unitsOf(v);
+    if (accum) {
+      var start = state.meta.init;
+      $("accum-span").textContent = hoursBetween(start, f.time) + " h · toda la simulación";
+      $("accum-start").textContent = localDayTime(start);
+      $("accum-end").textContent = localDayTime(f.time);
+    } else {
+      fillTicks(frames);
+      state.wantTime = f.time;
+    }
+    var tl = $("time-label");
+    tl.textContent = "";
+    tl.appendChild(el("span", "tl-local", localDayTime(f.time)));
+    tl.appendChild(el("span", "tl-utc", utc(f.time) + (frames.length > 1 ? " · " + (state.idx + 1) + "/" + frames.length : "")));
     var nxt = frames[(state.idx + 1) % frames.length];
-    if (nxt && nxt !== f) { (new Image()).src = "runs/" + encodeURIComponent(state.runId) + "/" + nxt.file; }
+    if (!live && nxt && nxt !== f) { (new Image()).src = runBase() + nxt.file; }
     writeHash();
+    updateSide(false);
+    dataP.then(function (ok) { if (ok) { updateSide(true); } });
   }
+
+  // ------------------------------------------------------------------ side cards
+  function pointList() { return state.points.length ? state.points : ((state.meta && state.meta.points) || []); }
+
+  // value at a point from points.json, only when it describes the shown domain and instant
+  function seriesValue(p, v, f) {
+    if (p.domain !== state.dom) { return null; }
+    if (v.kind === "rain_total") { return p.total_mm === null || p.total_mm === undefined ? null : fmtNum(p.total_mm) + " mm"; }
+    var s = p.series;
+    var key = { rain_step: "rain_step_mm", t2: "t2_c", wind10: "wind_kmh" }[v.kind];
+    if (!s || !key || !s[key] || !s.times) { return null; }
+    if (v.kind === "rain_step" && p.step_min && v.interval_min && p.step_min !== v.interval_min) { return null; }
+    var i = s.times.indexOf(f.time);
+    if (i < 0 || s[key][i] === null || s[key][i] === undefined) { return null; }
+    return fmtNum(s[key][i]) + " " + (v.kind === "rain_step" ? "mm" : v.units);
+  }
+
+  function updateSide(withGrid) {
+    var v = currentVar(), dom = domain(), f = currentFrames()[state.idx];
+    var pts = pointList();
+    $("pts-card").hidden = !pts.length || !v;
+    var ul = $("pts-now");
+    ul.textContent = "";
+    var fromGrid = withGrid && useInteractive();
+    if (v && f) {
+      pts.forEach(function (p) {
+        var val = fromGrid ? window.BeniMap.valueAt(p.lat, p.lon) : seriesValue(p, v, f);
+        var li = el("li");
+        li.appendChild(el("span", "pname", p.name));
+        li.appendChild(el("span", "pval", val || "—"));
+        ul.appendChild(li);
+      });
+      $("pts-note").textContent = (v.kind === "rain_total" ? "Total de la simulación" : localDayTime(f.time)) +
+        " · celda de " + domText(dom) + " que contiene cada punto";
+    }
+    var mx = fromGrid && v ? window.BeniMap.extreme(v.kind === "mslp") : null;
+    state.maxAt = mx;
+    $("max-card").hidden = !mx;
+    if (mx) {
+      $("max-h").textContent = v.kind === "mslp" ? "Mínimo en el dominio" : "Máximo en el dominio";
+      var m = /^(-?[\d.,]+) (.+)$/.exec(mx.text);   // "103 mm" -> number + unit; "Sin eco" stays whole
+      $("max-val").textContent = m ? m[1] : mx.text;
+      $("max-units").textContent = m ? m[2] : "";
+      $("max-where").textContent = "En " + coordText(mx.lat, mx.lon) + " · " + domText(dom) +
+        (v.kind === "rain_total" ? "" : " · " + localDayTime(f.time));
+    }
+  }
+
+  function coordText(lat, lon) {
+    return fmtNum3(Math.abs(lat)) + "° " + (lat >= 0 ? "N" : "S") + ", " + fmtNum3(Math.abs(lon)) + "° " + (lon >= 0 ? "E" : "O");
+  }
+  function fmtNum3(v) { return Number(v).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
 
   function fillPoints() {
     var sec = $("points-section");
@@ -211,7 +401,7 @@
     var charts = $("point-charts");
     body.textContent = "";
     charts.textContent = "";
-    var pts = state.points.length ? state.points : (state.meta.points || []);
+    var pts = pointList();
     sec.hidden = !pts.length;
     pts.forEach(function (p) {
       var tr = document.createElement("tr");
@@ -234,9 +424,7 @@
         img.alt = "Serie temporal en " + p.name + ": lluvia por intervalo y acumulada, temperatura a 2 m y viento a 10 m";
         img.width = 576;
         img.height = 378;
-        var cap = document.createElement("figcaption");
-        cap.className = "muted";
-        cap.textContent = p.name + " · celda " + p.grid_lat + ", " + p.grid_lon + " (" + Math.round(p.hgt_m) + " m)";
+        var cap = el("figcaption", "", p.name + " · celda " + p.grid_lat + ", " + p.grid_lon + " (" + Math.round(p.hgt_m) + " m)");
         fig.appendChild(img);
         fig.appendChild(cap);
         charts.appendChild(fig);
@@ -251,10 +439,24 @@
 
   function fillInfo() {
     var m = state.meta;
+    $("run-kind").textContent = m.event ? "Evento" : "Predicción";
     $("run-title").textContent = m.title || m.name;
-    $("run-info").textContent = (m.event ? "Evento" : "Predicción") + " · inicio " + local(m.init) +
-      " hora local (" + utc(m.init) + ") · hasta " + local(m.end) + " hora local";
+    var info = $("run-info");
+    info.textContent = localDayTime(m.init) + " → " + localDayTime(m.end) + " hora local ";
+    info.appendChild(el("span", "faint", "· " + utcHm(m.init) + "–" + utcHm(m.end) + " UTC · " +
+      hoursBetween(m.init, m.end) + " h"));
     var mod = m.model || {};
+    var dl = $("details");
+    dl.textContent = "";
+    [["Inicio", localDayTime(m.init), ""],
+     ["Fin", localDayTime(m.end), ""],
+     ["UTC", utcHm(m.init) + " → " + utcHm(m.end), "mono"],
+     ["Modelo", "WRF " + (mod.wrf || "?") + " · " + (mod.ic_bc || "?") + " · " + m.domains.length +
+       (m.domains.length === 1 ? " dominio" : " dominios"), ""],
+     ["Ejecución", m.run_id, "mono"]].forEach(function (r) {
+      dl.appendChild(el("dt", "", r[0]));
+      dl.appendChild(el("dd", r[2], r[1]));
+    });
     $("model-info").textContent = "Modelo WRF " + (mod.wrf || "?") + " · condiciones iniciales y de contorno " +
       (mod.ic_bc || "?") + (mod.boundary_interval_hours ? " cada " + mod.boundary_interval_hours + " h" : "") +
       (mod.e_vert ? " · " + mod.e_vert + " niveles verticales" : "") + ". " + (m.physics_summary || "") +
@@ -263,16 +465,19 @@
   }
 
   // ------------------------------------------------------------------ actions
+  function setPlaying(on) {
+    $("play").setAttribute("aria-pressed", String(on));
+    $("play-label").textContent = on ? "Pausa" : "Reproducir";
+  }
+
   function stop() {
     if (state.timer) { clearInterval(state.timer); state.timer = null; }
-    $("play").setAttribute("aria-pressed", "false");
-    $("play").textContent = "Reproducir";
+    setPlaying(false);
   }
 
   function togglePlay() {
     if (state.timer) { stop(); return; }
-    $("play").setAttribute("aria-pressed", "true");
-    $("play").textContent = "Pausa";
+    setPlaying(true);
     state.timer = setInterval(function () { step(1, true); }, PLAY_MS);
   }
 
@@ -284,9 +489,14 @@
     showFrame();
   }
 
+  function keepTime() {
+    var f = currentFrames()[state.idx];
+    return state.kind === "rain_total" && state.wantTime ? state.wantTime : (f ? f.time : null);
+  }
+
   function selectKind(kind) {
-    var frames = currentFrames();
-    var keep = frames[state.idx] ? frames[state.idx].time : null;
+    var keep = keepTime();
+    stop();
     state.kind = kind;
     state.idx = closestIndex(currentFrames(), keep);
     fillTabs();
@@ -294,13 +504,28 @@
   }
 
   function selectDomain(id) {
-    var frames = currentFrames();
-    var keep = frames[state.idx] ? frames[state.idx].time : null;
+    var keep = keepTime();
     state.dom = id;
+    state.fitPending = true;
     if (!currentVar()) { state.kind = "rain_total"; }
     state.idx = closestIndex(currentFrames(), keep);
+    markDomains();
     fillTabs();
     showFrame();
+  }
+
+  function copyLink() {
+    var url = location.href, label = $("copy-label"), status = $("copy-status");
+    function done(ok) {
+      label.textContent = ok ? "Enlace copiado" : "No se pudo copiar";
+      status.textContent = ok ? "Enlace copiado al portapapeles" : "No se pudo copiar. Enlace: " + url;
+      setTimeout(function () { label.textContent = "Copiar enlace"; status.textContent = ""; }, 2500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); });
+    } else {
+      done(false);
+    }
   }
 
   function loadRun(id, wanted) {
@@ -319,25 +544,37 @@
       state.dom = doms.indexOf(d) >= 0 ? d : finest.id;
       var k = kindOf(wanted && wanted["var"]);
       state.kind = k && variableOf(domain(), k) ? k : "rain_total";
-      state.idx = closestIndex(currentFrames(), wanted && wanted.t);
+      state.wantTime = (wanted && wanted.t) || null;
+      state.idx = closestIndex(currentFrames(), state.wantTime);
       fillRuns();
       fillInfo();
       fillDomains();
       fillTabs();
       fillPoints();
-      showFrame();
+      state.fitPending = true;
+      return state.mapReady.then(function (ok) {
+        state.interactive = ok;
+        if (ok) { window.BeniMap.setPoints(state.meta.points || []); }
+        showFrame();
+      });
     }).catch(function (e) {
       showError("No se pudo cargar la simulación " + id + " (" + e.message + ").");
     });
   }
 
   function init() {
+    state.mapReady = window.BeniMap
+      ? window.BeniMap.init("mapgl", { describe: describeValue }).catch(function () { return false; })
+      : Promise.resolve(false);
     $("run").addEventListener("change", function (e) { loadRun(e.target.value, null); });
-    $("domain").addEventListener("change", function (e) { selectDomain(parseInt(e.target.value, 10)); });
     $("time").addEventListener("input", function (e) { stop(); state.idx = parseInt(e.target.value, 10) || 0; showFrame(); });
     $("prev").addEventListener("click", function () { step(-1); });
     $("next").addEventListener("click", function () { step(1); });
     $("play").addEventListener("click", togglePlay);
+    $("copy-link").addEventListener("click", copyLink);
+    $("max-show").addEventListener("click", function () {
+      if (state.maxAt) { window.BeniMap.showAt(state.maxAt.lat, state.maxAt.lon); $("viewer").scrollIntoView(); }
+    });
     document.addEventListener("keydown", function (e) {
       var tag = (e.target && e.target.tagName) || "";
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.altKey || e.ctrlKey || e.metaKey) { return; }
@@ -346,9 +583,8 @@
     });
     window.addEventListener("hashchange", function () {
       var h = readHash();
-      var f = currentFrames()[state.idx];
       if (h.run && h.run !== state.runId) { loadRun(h.run, h); return; }
-      if (f && h.t === f.time && kindOf(h["var"]) === state.kind && parseInt(h.d, 10) === state.dom) { return; }
+      if (h.t === state.wantTime && kindOf(h["var"]) === state.kind && parseInt(h.d, 10) === state.dom) { return; }
       if (h.run && state.meta) { loadRun(h.run, h); }
     });
 

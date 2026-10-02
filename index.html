@@ -7,51 +7,148 @@
   <meta name="description" content="Simulaciones experimentales del modelo WRF sobre Valencia: lluvia, viento, temperatura y presión.">
   <title>BeniTemps · mapas</title>
   <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
+  <script src="vendor/pmtiles.js" defer></script>
+  <script src="map.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#viewer">Saltar al mapa</a>
   <header class="top">
-    <h1>BeniTemps</h1>
-    <p class="sub">Simulaciones de alta resolución de lluvia, viento y temperatura con el modelo WRF</p>
+    <div class="wrap top-in">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M7 16a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 7a4.5 4.5 0 0 1 .5 8.97"/><path d="M9 19l-1 2"/><path d="M13 18l-1 3"/><path d="M17 18l-1 2"/></svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">BeniTemps</span>
+          <span class="brand-sub">Simulaciones WRF de alta resolución · València</span>
+        </span>
+      </div>
+      <nav class="nav" aria-label="Secciones">
+        <a href="#viewer">Mapa</a>
+        <a href="#points-section">Puntos</a>
+        <a href="#about">Modelo</a>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <section class="controls" aria-label="Selección de simulación">
-      <div class="field">
-        <label for="run">Simulación</label>
-        <select id="run"></select>
+  <main class="wrap">
+    <section class="event" aria-label="Selección de simulación">
+      <div class="event-text">
+        <p class="eyebrow" id="run-kind">Evento</p>
+        <h1 id="run-title"></h1>
+        <p id="run-info"></p>
       </div>
-      <div class="field">
-        <label for="domain">Dominio (resolución)</label>
-        <select id="domain"></select>
+      <div class="pickers">
+        <div class="field field-run">
+          <label for="run">Simulación</label>
+          <select id="run"></select>
+        </div>
+        <div class="field">
+          <span class="field-label" id="domain-label">Dominio</span>
+          <div id="domain" class="seg" role="group" aria-labelledby="domain-label"></div>
+        </div>
       </div>
     </section>
 
-    <h2 id="run-title"></h2>
-    <p id="run-info" class="muted"></p>
+    <p id="error" class="error" role="alert" hidden></p>
 
-    <div class="tabs" id="vars" role="group" aria-label="Variable"></div>
+    <div class="layout">
+      <section class="card mapcard" id="viewer" aria-label="Mapa">
+        <div class="tabs" id="vars" role="group" aria-label="Variable"></div>
+        <div class="mapframe">
+          <div id="mapgl" class="mapgl" role="application"
+               aria-label="Mapa interactivo: pulsa en un punto para ver su valor" hidden></div>
+          <figure id="static-fig">
+            <img id="map" alt="" width="800" height="860" decoding="async">
+          </figure>
+          <p id="map-chip" class="chip" aria-hidden="true"></p>
+        </div>
+        <div class="legend-box">
+          <div class="legend-head">
+            <span id="caption"></span>
+            <span id="legend-units" class="mono"></span>
+          </div>
+          <div id="legend" class="legend" aria-label="Leyenda" hidden></div>
+          <p class="hint">Pulsa en el mapa para ver el valor en ese punto. Teclado: flechas izquierda/derecha
+            para cambiar de instante. La zona gris queda fuera del área calculada.</p>
+        </div>
+        <div class="timebox">
+          <div id="accum" class="accum" hidden>
+            <div class="accum-head">
+              <span class="faint">Ventana de acumulación</span>
+              <span id="accum-span" class="mono"></span>
+            </div>
+            <div class="accum-bar"></div>
+            <div class="accum-ends mono"><span id="accum-start"></span><span id="accum-end"></span></div>
+          </div>
+          <div id="player" class="timebar">
+            <div class="steps">
+              <button id="prev" class="btn icon" type="button" aria-label="Instante anterior">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <button id="play" class="play" type="button" aria-pressed="false">
+                <svg class="i-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg>
+                <svg class="i-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
+                <span id="play-label">Reproducir</span>
+              </button>
+              <button id="next" class="btn icon" type="button" aria-label="Instante siguiente">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+            <div class="scrub">
+              <label for="time" class="sr-only">Instante de la simulación</label>
+              <input id="time" type="range" min="0" max="0" step="1" value="0">
+              <div id="ticks" class="ticks mono" aria-hidden="true"></div>
+            </div>
+            <p id="time-label" class="time-label" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
 
-    <section class="viewer" id="viewer" aria-label="Mapa">
-      <figure>
-        <img id="map" alt="" width="800" height="860" decoding="async">
-        <figcaption id="caption" class="muted"></figcaption>
-      </figure>
-      <div class="timebar">
-        <button id="prev" type="button" aria-label="Hora anterior">&#9664;</button>
-        <button id="play" type="button" aria-pressed="false">Reproducir</button>
-        <button id="next" type="button" aria-label="Hora siguiente">&#9654;</button>
-        <label for="time" class="sr-only">Hora válida</label>
-        <input id="time" type="range" min="0" max="0" step="1" value="0">
-      </div>
-      <p id="time-label" class="time-label" aria-live="polite"></p>
-      <p class="muted hint">Teclado: flechas izquierda/derecha para cambiar de hora.</p>
-    </section>
+      <aside class="side" aria-label="Resumen">
+        <section class="card side-card" id="pts-card" aria-labelledby="pts-h" hidden>
+          <div class="card-head">
+            <h2 id="pts-h">En tus puntos</h2>
+            <a href="#points-section">Ver series</a>
+          </div>
+          <ul id="pts-now" class="rows"></ul>
+          <p id="pts-note" class="note"></p>
+        </section>
 
-    <section id="points-section" aria-labelledby="points-h" hidden>
-      <h2 id="points-h">Puntos</h2>
+        <section class="card side-card" id="max-card" aria-labelledby="max-h" hidden>
+          <h2 id="max-h">Máximo en el dominio</h2>
+          <p class="big"><span id="max-val" class="mono"></span> <span id="max-units" class="faint"></span></p>
+          <p class="note"><span id="max-where"></span>
+            <button id="max-show" class="linkbtn" type="button">Ver en el mapa</button></p>
+        </section>
+
+        <section class="card side-card" aria-labelledby="details-h">
+          <h2 id="details-h">Detalles</h2>
+          <dl id="details" class="details"></dl>
+        </section>
+
+        <div class="actions">
+          <a id="static-link" class="btn" href="#" target="_blank" rel="noopener" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+            Imagen PNG</a>
+          <button id="copy-link" class="btn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+            <span id="copy-label">Copiar enlace</span></button>
+        </div>
+        <p id="copy-status" class="sr-only" aria-live="polite"></p>
+      </aside>
+    </div>
+
+    <section id="points-section" class="card points" aria-labelledby="points-h" hidden>
+      <h2 id="points-h">Series por punto</h2>
       <div class="table-wrap">
         <table>
           <caption class="sr-only">Resumen de lluvia por punto</caption>
@@ -69,14 +166,12 @@
       </div>
       <div id="point-charts" class="charts"></div>
     </section>
-
-    <p id="error" class="error" role="alert" hidden></p>
   </main>
 
-  <footer>
+  <footer id="about" class="wrap foot">
     <p class="disclaimer"><strong>Predicción experimental, no oficial.</strong>
       Avisos oficiales: <a href="https://www.aemet.es/">AEMET (aemet.es)</a>.</p>
-    <p id="model-info" class="muted"></p>
+    <p id="model-info"></p>
   </footer>
 </body>
 </html>

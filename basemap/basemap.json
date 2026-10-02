@@ -1,0 +1,103 @@
+{
+ "schema": 1,
+ "built_at": "2026-10-02T18:37:16Z",
+ "osm_build": "20261002",
+ "focus": {
+  "bbox": [
+   -0.8,
+   39.2,
+   0.0,
+   39.75
+  ],
+  "center": [
+   -0.38,
+   39.47
+  ],
+  "zoom": 11
+ },
+ "osm": [
+  {
+   "file": "osm-low.pmtiles",
+   "tier": "low",
+   "bbox": [
+    -10.82,
+    32.836,
+    10.02,
+    45.62
+   ],
+   "minzoom": 0,
+   "maxzoom": 8
+  },
+  {
+   "file": "osm-mid.pmtiles",
+   "tier": "mid",
+   "bbox": [
+    -2.301,
+    38.401,
+    0.898,
+    40.494
+   ],
+   "minzoom": 9,
+   "maxzoom": 11
+  },
+  {
+   "file": "osm-focus.pmtiles",
+   "tier": "focus",
+   "bbox": [
+    -0.8,
+    39.2,
+    0.0,
+    39.75
+   ],
+   "minzoom": 12,
+   "maxzoom": 14
+  }
+ ],
+ "dem": [
+  {
+   "file": "dem-low.pmtiles",
+   "tier": "low",
+   "bbox": [
+    -10.82,
+    32.836,
+    10.02,
+    45.62
+   ],
+   "minzoom": 0,
+   "maxzoom": 7,
+   "encoding": "terrarium"
+  },
+  {
+   "file": "dem-mid.pmtiles",
+   "tier": "mid",
+   "bbox": [
+    -2.301,
+    38.401,
+    0.898,
+    40.494
+   ],
+   "minzoom": 8,
+   "maxzoom": 10,
+   "encoding": "terrarium"
+  },
+  {
+   "file": "dem-focus.pmtiles",
+   "tier": "focus",
+   "bbox": [
+    -0.8,
+    39.2,
+    0.0,
+    39.75
+   ],
+   "minzoom": 11,
+   "maxzoom": 12,
+   "encoding": "terrarium"
+  }
+ ],
+ "glyphs": "fonts/{fontstack}/{range}.pbf",
+ "fonts": [
+  "Noto Sans Regular",
+  "Noto Sans Medium"
+ ],
+ "attribution": "© <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> · <a href=\"https://protomaps.com\">Protomaps</a> · relieve <a href=\"https://mapterhorn.com/attribution\">Mapterhorn</a>"
+}
